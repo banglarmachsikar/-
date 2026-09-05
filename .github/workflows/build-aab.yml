@@ -14,6 +14,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Extract Android Project
+        run: |
+          unzip -q BanglarMachShikar_GitHub_Upload.zip -d project
+          echo "Project extracted"
+          find project -maxdepth 4 -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \)
+
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
@@ -25,11 +31,33 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Find Gradle Project
+        run: |
+          GRADLE_FILE=$(find project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1)
+
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "ERROR: Gradle project not found!"
+            exit 1
+          fi
+
+          GRADLE_DIR=$(dirname "$GRADLE_FILE")
+          echo "Gradle project found at: $GRADLE_DIR"
+          echo "GRADLE_DIR=$GRADLE_DIR" >> "$GITHUB_ENV"
+
       - name: Build Release AAB
-        run: gradle bundleRelease
+        run: |
+          cd "$GRADLE_DIR"
+          chmod +x gradlew 2>/dev/null || true
+
+          if [ -f "./gradlew" ]; then
+            ./gradlew bundleRelease
+          else
+            gradle bundleRelease
+          fi
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: release-aab
-          path: app/build/outputs/bundle/release/*.aab
+          path: |
+            project/**/build/outputs/bundle/release/*.aab
